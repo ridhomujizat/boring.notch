@@ -122,6 +122,10 @@ extension Defaults.Keys {
     static let closeGestureEnabled = Key<Bool>("closeGestureEnabled", default: true)
     static let gestureSensitivity = Key<CGFloat>("gestureSensitivity", default: 200.0)
     
+    // MARK: Agent activity (Claude Code / Codex)
+    static let enableAgentPeek = Key<Bool>("enableAgentPeek", default: false)
+    static let enableAgentLiveActivity = Key<Bool>("enableAgentLiveActivity", default: false)
+
     // MARK: Media playback
     static let coloredSpectrogram = Key<Bool>("coloredSpectrogram", default: true)
     static let enableSneakPeek = Key<Bool>("enableSneakPeek", default: false)

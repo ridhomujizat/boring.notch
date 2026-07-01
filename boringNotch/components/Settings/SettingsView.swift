@@ -571,6 +571,25 @@ struct HUD: View {
                 Text("Closed Notch")
             }
             .disabled(!Defaults[.hudReplacement])
+
+            Section {
+                Defaults.Toggle(key: .enableAgentPeek) {
+                    Text("Show coding-agent sneak peek")
+                }
+                Defaults.Toggle(key: .enableAgentLiveActivity) {
+                    Text("Include live activity (tool use, prompts)")
+                }
+                .disabled(!Defaults[.enableAgentPeek])
+                Text("Pops a peek when Claude Code / Codex finishes, needs approval, or (optionally) works. Requires the matching hook from contrib/hooks.")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } header: {
+                HStack {
+                    Text("Agent Activity")
+                    customBadge(text: "Beta")
+                }
+            }
         }
         .accentColor(.effectiveAccent)
         .navigationTitle("HUDs")

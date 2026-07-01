@@ -46,6 +46,170 @@ struct ExpandedItem {
     var browser: BrowserType = .chromium
 }
 
+// MARK: - Agent activity (Claude Code / Codex, provider-agnostic)
+
+enum AgentProvider: Codable, Equatable {
+    case claudeCode
+    case codex
+    case other(String)
+
+    init(from decoder: Decoder) throws {
+        let rawValue = try decoder.singleValueContainer().decode(String.self)
+        switch rawValue.normalizedAgentToken {
+        case "claudecode", "claude":
+            self = .claudeCode
+        case "codex":
+            self = .codex
+        default:
+            self = .other(rawValue)
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .claudeCode:
+            try container.encode("claudeCode")
+        case .codex:
+            try container.encode("codex")
+        case let .other(rawValue):
+            try container.encode(rawValue)
+        }
+    }
+}
+
+enum AgentEventKind: Codable, Equatable {
+    case working
+    case needsInput
+    case done
+    case error
+
+    init(from decoder: Decoder) throws {
+        let rawValue = try decoder.singleValueContainer().decode(String.self)
+        switch rawValue.normalizedAgentToken {
+        case "needsinput", "needinput", "input", "approval", "needsapproval", "notification":
+            self = .needsInput
+        case "done", "finished", "finish", "completed", "complete", "stop", "success":
+            self = .done
+        case "error", "failed", "failure":
+            self = .error
+        default:
+            self = .working
+        }
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.singleValueContainer()
+        switch self {
+        case .working:
+            try container.encode("working")
+        case .needsInput:
+            try container.encode("needsInput")
+        case .done:
+            try container.encode("done")
+        case .error:
+            try container.encode("error")
+        }
+    }
+}
+
+struct AgentEvent: Codable {
+    var provider: AgentProvider
+    var kind: AgentEventKind
+    var title: String
+    var message: String
+    var host: String?      // "Ghostty", "VS Code", "Terminal", …
+    var project: String?   // basename(cwd)
+    var cwd: String?
+    var ts: Double?
+
+    private enum CodingKeys: String, CodingKey {
+        case provider
+        case kind
+        case title
+        case message
+        case host
+        case project
+        case cwd
+        case ts
+    }
+
+    init(
+        provider: AgentProvider,
+        kind: AgentEventKind,
+        title: String,
+        message: String,
+        host: String? = nil,
+        project: String? = nil,
+        cwd: String? = nil,
+        ts: Double? = nil
+    ) {
+        self.provider = provider
+        self.kind = kind
+        self.title = title
+        self.message = message
+        self.host = host
+        self.project = project
+        self.cwd = cwd
+        self.ts = ts
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+
+        provider = (try? container.decode(AgentProvider.self, forKey: .provider)) ?? .other("agent")
+        kind = (try? container.decode(AgentEventKind.self, forKey: .kind)) ?? .working
+        title = (try? container.decode(String.self, forKey: .title)) ?? provider.defaultTitle
+        message = (try? container.decode(String.self, forKey: .message)) ?? kind.defaultMessage
+        host = try? container.decode(String.self, forKey: .host)
+        project = try? container.decode(String.self, forKey: .project)
+        cwd = try? container.decode(String.self, forKey: .cwd)
+        ts = try? container.decode(Double.self, forKey: .ts)
+    }
+}
+
+struct AgentPeek {
+    var show: Bool = false
+    var event: AgentEvent? = nil
+}
+
+private extension String {
+    var normalizedAgentToken: String {
+        lowercased()
+            .replacingOccurrences(of: "_", with: "")
+            .replacingOccurrences(of: "-", with: "")
+            .replacingOccurrences(of: " ", with: "")
+    }
+}
+
+private extension AgentProvider {
+    var defaultTitle: String {
+        switch self {
+        case .claudeCode:
+            return "Claude Code"
+        case .codex:
+            return "Codex"
+        case let .other(rawValue):
+            return rawValue.isEmpty ? "Agent" : rawValue
+        }
+    }
+}
+
+private extension AgentEventKind {
+    var defaultMessage: String {
+        switch self {
+        case .working:
+            return "working"
+        case .needsInput:
+            return "needs your input"
+        case .done:
+            return "finished"
+        case .error:
+            return "failed"
+        }
+    }
+}
+
 @MainActor
 class BoringViewCoordinator: ObservableObject {
     static let shared = BoringViewCoordinator()
@@ -256,6 +420,32 @@ class BoringViewCoordinator: ObservableObject {
             } else {
                 sneakPeekTask?.cancel()
             }
+        }
+    }
+
+    // MARK: - Agent peek (same auto-hide pattern as sneakPeek, longer to read text)
+
+    private var agentPeekTask: Task<Void, Never>?
+
+    @Published var agentPeek: AgentPeek = .init() {
+        didSet {
+            agentPeekTask?.cancel()
+            guard agentPeek.show else { return }
+            // needsInput lingers longer since it asks the user to act.
+            let duration: TimeInterval = agentPeek.event?.kind == .needsInput ? 6 : 4
+            agentPeekTask = Task { [weak self] in
+                try? await Task.sleep(for: .seconds(duration))
+                guard let self, !Task.isCancelled else { return }
+                await MainActor.run {
+                    withAnimation { self.agentPeek.show = false }
+                }
+            }
+        }
+    }
+
+    func showAgentPeek(_ event: AgentEvent) {
+        withAnimation(.smooth) {
+            agentPeek = AgentPeek(show: true, event: event)
         }
     }
 

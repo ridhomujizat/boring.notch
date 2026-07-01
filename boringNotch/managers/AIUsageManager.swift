@@ -1082,7 +1082,7 @@ private struct CodexRefreshErrorResponse: Decodable {
 
 // MARK: - Utilities
 
-private enum UserHome {
+enum UserHome {
     static var url: URL {
         if let home = currentPOSIXHome() {
             return URL(fileURLWithPath: home)

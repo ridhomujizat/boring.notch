@@ -21,6 +21,8 @@
 		<string>/.claude/.credentials.json</string>
 		<string>/.config/codex/auth.json</string>
 		<string>/.codex/auth.json</string>
+		<string>/.config/boring-notch/</string>
+		<string>/.config/boring-notch/events.jsonl</string>
 	</array>
 	<key>com.apple.security.network.client</key>
 	<true/>

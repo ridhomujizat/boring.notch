@@ -281,6 +281,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
 
+        // Start watching for coding-agent events (self-observes the toggle).
+        AgentEventManager.shared.applyEnabledState()
+
         NotificationCenter.default.addObserver(
             self,
             selector: #selector(screenConfigurationDidChange),
