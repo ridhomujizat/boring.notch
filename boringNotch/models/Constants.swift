@@ -199,4 +199,8 @@ extension Defaults.Keys {
     }
 
     static let didClearLegacyURLCacheV1 = Key<Bool>("didClearLegacyURLCache_v1", default: false)
+
+    // MARK: AI Usage (Claude Code / Codex live quota)
+    static let enableUsageTab = Key<Bool>("enableUsageTab", default: true)
+    static let usageRefreshInterval = Key<Double>("usageRefreshInterval", default: 300)
 }

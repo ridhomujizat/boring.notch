@@ -240,6 +240,11 @@ struct ContentView: View {
                 }
             }
         }
+        .onChange(of: coordinator.currentView) {
+            withAnimation(animationSpring) {
+                vm.syncOpenSizeWithCurrentView()
+            }
+        }
     }
 
     @ViewBuilder
@@ -349,6 +354,8 @@ struct ContentView: View {
                         NotchHomeView(albumArtNamespace: albumArtNamespace)
                     case .shelf:
                         ShelfView()
+                    case .usage:
+                        UsageView()
                     }
                 }
                 .transition(
