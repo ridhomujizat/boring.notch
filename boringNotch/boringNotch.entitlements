@@ -19,8 +19,12 @@
 	<key>com.apple.security.temporary-exception.files.home-relative-path.read-write</key>
 	<array>
 		<string>/.claude/.credentials.json</string>
+		<string>/.claude/</string>
+		<string>/.claude/settings.json</string>
 		<string>/.config/codex/auth.json</string>
 		<string>/.codex/auth.json</string>
+		<string>/.codex/</string>
+		<string>/.codex/config.toml</string>
 		<string>/.config/boring-notch/</string>
 		<string>/.config/boring-notch/events.jsonl</string>
 	</array>

@@ -5,18 +5,22 @@
 //  Transient closed-notch peek for coding-agent activity (Claude Code, Codex).
 //
 
+import AppKit
 import SwiftUI
 
 struct AgentSneakPeekView: View {
     let event: AgentEvent?
     let width: CGFloat
 
-    private let horizontalPadding: CGFloat = 14
-    private let iconWidth: CGFloat = 18
-    private let iconSpacing: CGFloat = 8
+    private let horizontalPadding: CGFloat = 6
+    private let providerLogoWidth: CGFloat = 18
+    private let actionIconWidth: CGFloat = 18
+    private let sessionIconWidth: CGFloat = 18
+    private let iconSpacing: CGFloat = 7
 
     private var marqueeWidth: CGFloat {
-        max(48, width - (horizontalPadding * 2) - iconWidth - iconSpacing)
+        let fixedContentWidth = providerLogoWidth + actionIconWidth + sessionIconWidth + (iconSpacing * 3)
+        return max(48, width - (horizontalPadding * 2) - fixedContentWidth)
     }
 
     private var icon: String {
@@ -39,8 +43,10 @@ struct AgentSneakPeekView: View {
 
     private var label: String {
         guard let event else { return "" }
-        let context = [event.host, event.project].compactMap { $0 }.joined(separator: " · ")
-        return context.isEmpty ? event.title : context
+        if let project = event.project, !project.isEmpty {
+            return project
+        }
+        return event.title
     }
 
     private var message: String {
@@ -53,10 +59,13 @@ struct AgentSneakPeekView: View {
 
     var body: some View {
         HStack(alignment: .center, spacing: iconSpacing) {
+            providerLogo
+                .frame(width: providerLogoWidth, height: providerLogoWidth)
+
             Image(systemName: icon)
                 .symbolVariant(event?.kind == .needsInput ? .none : .fill)
                 .foregroundStyle(tint)
-                .frame(width: iconWidth, height: 18)
+                .frame(width: actionIconWidth, height: 18)
 
             MarqueeText(
                 .constant(text),
@@ -67,6 +76,9 @@ struct AgentSneakPeekView: View {
                 frameWidth: marqueeWidth
             )
             .frame(width: marqueeWidth, alignment: .leading)
+
+            sessionIcon
+                .frame(width: sessionIconWidth, height: sessionIconWidth)
         }
         .padding(.horizontal, horizontalPadding)
         .frame(width: width, height: 28, alignment: .center)
@@ -74,6 +86,77 @@ struct AgentSneakPeekView: View {
             Rectangle()
                 .fill(.white.opacity(0.08))
                 .frame(height: 1)
+        }
+    }
+
+    @ViewBuilder
+    private var providerLogo: some View {
+        switch event?.provider {
+        case .codex:
+            Image("codexUsageIcon")
+                .resizable()
+                .scaledToFit()
+                .clipShape(.rect(cornerRadius: 4))
+        case .claudeCode:
+            Image("claudeUsageIcon")
+                .resizable()
+                .scaledToFit()
+                .clipShape(.rect(cornerRadius: 4))
+        default:
+            Image(systemName: "cpu")
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(.gray)
+        }
+    }
+
+    @ViewBuilder
+    private var sessionIcon: some View {
+        if let host = event?.host, let image = AgentHostIcon.image(for: host) {
+            Image(nsImage: image)
+                .resizable()
+                .scaledToFit()
+                .clipShape(.rect(cornerRadius: 4))
+        } else {
+            Image(systemName: "terminal")
+                .resizable()
+                .scaledToFit()
+                .foregroundStyle(.gray)
+        }
+    }
+}
+
+private enum AgentHostIcon {
+    static func image(for host: String) -> NSImage? {
+        guard let bundleIdentifier = bundleIdentifier(for: host),
+              let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier)
+        else {
+            return nil
+        }
+
+        return NSWorkspace.shared.icon(forFile: appURL.path)
+    }
+
+    private static func bundleIdentifier(for host: String) -> String? {
+        let normalizedHost = host
+            .lowercased()
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: ".", with: "")
+            .replacingOccurrences(of: "-", with: "")
+
+        switch normalizedHost {
+        case "ghostty":
+            return "com.mitchellh.ghostty"
+        case "vscode", "visualstudiocode":
+            return "com.microsoft.VSCode"
+        case "terminal", "appleterminal":
+            return "com.apple.Terminal"
+        case "iterm", "itermapp", "iterm2":
+            return "com.googlecode.iterm2"
+        case "wezterm":
+            return "com.github.wez.wezterm"
+        default:
+            return nil
         }
     }
 }

@@ -470,6 +470,8 @@ struct HUD: View {
     @Default(.hudReplacement) var hudReplacement
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @State private var accessibilityAuthorized = false
+    @State private var agentSetupMessage: String?
+    @State private var agentSetupSucceeded = true
     
     var body: some View {
         Form {
@@ -576,11 +578,36 @@ struct HUD: View {
                 Defaults.Toggle(key: .enableAgentPeek) {
                     Text("Show coding-agent sneak peek")
                 }
+                HStack(spacing: 10) {
+                    Button {
+                        setupAgentNotifications(.codex)
+                    } label: {
+                        Label("Setup Codex", systemImage: "terminal")
+                    }
+
+                    Button {
+                        setupAgentNotifications(.claudeCode)
+                    } label: {
+                        Label("Setup Claude Code", systemImage: "sparkles")
+                    }
+                }
+
                 Defaults.Toggle(key: .enableAgentLiveActivity) {
                     Text("Include live activity (tool use, prompts)")
                 }
                 .disabled(!Defaults[.enableAgentPeek])
-                Text("Pops a peek when Claude Code / Codex finishes, needs approval, or (optionally) works. Requires the matching hook from contrib/hooks.")
+
+                if let agentSetupMessage {
+                    Label(
+                        agentSetupMessage,
+                        systemImage: agentSetupSucceeded ? "checkmark.circle.fill" : "xmark.octagon.fill"
+                    )
+                    .font(.caption)
+                    .foregroundStyle(agentSetupSucceeded ? .green : .red)
+                    .fixedSize(horizontal: false, vertical: true)
+                }
+
+                Text("Pops a peek when Claude Code / Codex finishes, needs approval, or (optionally) works. Use setup buttons to install the hooks. Requires jq.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)
@@ -606,6 +633,19 @@ struct HUD: View {
             if let granted = notification.userInfo?["granted"] as? Bool {
                 accessibilityAuthorized = granted
             }
+        }
+    }
+
+    private func setupAgentNotifications(_ target: AgentNotificationSetupTarget) {
+        do {
+            let result = try AgentNotificationSetupManager.install(target)
+            Defaults[.enableAgentPeek] = true
+            AgentEventManager.shared.applyEnabledState()
+            agentSetupSucceeded = true
+            agentSetupMessage = result.message
+        } catch {
+            agentSetupSucceeded = false
+            agentSetupMessage = error.localizedDescription
         }
     }
 }
