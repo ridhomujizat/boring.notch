@@ -21,11 +21,30 @@ EVENT="$(printf '%s' "$INPUT" | jq -r '.hook_event_name // ""')"
 CWD="$(printf '%s' "$INPUT" | jq -r '.cwd // ""')"
 TOOL="$(printf '%s' "$INPUT" | jq -r '.tool_name // ""')"
 TRANSCRIPT="$(printf '%s' "$INPUT" | jq -r '.transcript_path // ""')"
+SESSION_ID="$(printf '%s' "$INPUT" | jq -r '.session_id // "unknown"')"
 
-# Heavy stats only at turn boundaries (Stop / Notification) — parsing the
-# transcript and shelling out to git on every PostToolUse would be too costly.
-STATS='{}'
+# Heavy stats only at turn boundaries (Stop / Notification), or every 5th
+# PostToolUse in between — parsing the transcript and shelling out to git on
+# every single tool call would be too costly, but only refreshing at Stop
+# leaves the Sessions tab looking frozen during a long turn.
+COUNTER_DIR="$HOME/.config/boring-notch/.tool-counters"
+REFRESH_STATS=0
 if [[ "$EVENT" == "Stop" || "$EVENT" == "Notification" ]]; then
+  REFRESH_STATS=1
+elif [[ "$EVENT" == "SessionEnd" ]]; then
+  rm -f "$COUNTER_DIR/$SESSION_ID" 2>/dev/null || true
+elif [[ "$EVENT" == "PostToolUse" ]]; then
+  mkdir -p "$COUNTER_DIR"
+  COUNT_FILE="$COUNTER_DIR/$SESSION_ID"
+  COUNT=$(( $(cat "$COUNT_FILE" 2>/dev/null || echo 0) + 1 ))
+  printf '%s' "$COUNT" > "$COUNT_FILE"
+  if (( COUNT % 5 == 0 )); then
+    REFRESH_STATS=1
+  fi
+fi
+
+STATS='{}'
+if [[ "$REFRESH_STATS" == "1" ]]; then
   TOK='{}'
   if [[ -n "$TRANSCRIPT" && -f "$TRANSCRIPT" ]]; then
     TOK="$(jq -s '{

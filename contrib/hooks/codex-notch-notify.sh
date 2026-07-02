@@ -33,11 +33,28 @@ CWD="$(printf '%s' "$payload" | jq -r '.cwd // .working_directory // .workingDir
 [[ -z "$CWD" ]] && CWD="${PWD:-}"
 EVENT="$(printf '%s' "$payload" | jq -r '.hook_event_name // .type // .event // .kind // ""')"
 TRANSCRIPT="$(printf '%s' "$payload" | jq -r '.transcript_path // ""')"
+SESSION_ID="$(printf '%s' "$payload" | jq -r '.session_id // .sessionId // "unknown"')"
 
-# Heavy stats only at turn/input boundaries. Tool hooks can fire frequently.
-STATS='{}'
+# Heavy stats only at turn/input boundaries, or every 5th PostToolUse in
+# between — tool hooks can fire frequently, but only refreshing at the
+# boundary leaves the Sessions tab looking frozen during a long turn.
+COUNTER_DIR="$HOME/.config/boring-notch/.tool-counters"
 event_key="$(printf '%s' "$EVENT" | tr '[:upper:]' '[:lower:]')"
+REFRESH_STATS=0
 if [[ "$event_key" =~ stop|done|complete|finish|permission|approval|input|notify|notification ]]; then
+  REFRESH_STATS=1
+elif [[ "$EVENT" == "PostToolUse" ]]; then
+  mkdir -p "$COUNTER_DIR"
+  COUNT_FILE="$COUNTER_DIR/$SESSION_ID"
+  COUNT=$(( $(cat "$COUNT_FILE" 2>/dev/null || echo 0) + 1 ))
+  printf '%s' "$COUNT" > "$COUNT_FILE"
+  if (( COUNT % 5 == 0 )); then
+    REFRESH_STATS=1
+  fi
+fi
+
+STATS='{}'
+if [[ "$REFRESH_STATS" == "1" ]]; then
   TOK='{}'
   if [[ -n "$TRANSCRIPT" && -f "$TRANSCRIPT" ]]; then
     TOK="$(jq -s '
@@ -80,6 +97,7 @@ printf '%s\n' "$payload" | jq -c --arg host "$HOST" --arg hostBundleId "$HOST_BU
   ($payload.tool_name // $payload.tool // null) as $tool |
   ($payload.tool_input.file_path? // $payload.tool_input.path? // $payload.tool_input.uri? // "") as $fp |
   (if $fp == "" then null else ($fp | split("/") | last) end) as $target |
+  ($payload.tool_input.description? // null) as $approvalReason |
   (if $event == "sessionstart" then "start"
    elif $event == "sessionend" then "end"
    else null end) as $lifecycle |
@@ -91,8 +109,6 @@ printf '%s\n' "$payload" | jq -c --arg host "$HOST" --arg hostBundleId "$HOST_BU
     if (($tool // "") | ascii_downcase) == "apply_patch" then "Editing files"
     elif (($tool // "") | test("^mcp__")) then "Using MCP tool"
     elif (($tool // "") | ascii_downcase) == "bash" then "Running command"
-    elif (($tool // "") | ascii_downcase) == "read" then ("Reading " + ($target // "a file"))
-    elif (($tool // "") | ascii_downcase | test("edit|write")) then ("Editing " + ($target // "a file"))
     elif ($tool // "") != "" then ($prefix + " " + $tool)
     else "working" end;
   {
@@ -114,7 +130,7 @@ printf '%s\n' "$payload" | jq -c --arg host "$HOST" --arg hostBundleId "$HOST_BU
       // $payload.title
       // (if $event == "sessionstart" then "started"
           elif $event == "userpromptsubmit" then "working..."
-          elif $event == "permissionrequest" then ("needs approval" + (if $tool then ": " + $tool else "" end))
+          elif $event == "permissionrequest" then ("needs approval" + (if $approvalReason then ": " + $approvalReason elif $tool then ": " + $tool else "" end))
           elif $event == "pretooluse" then toolMessage("Starting")
           elif $event == "posttooluse" then toolMessage("Ran")
           elif $event == "precompact" then "compacting context"
@@ -127,3 +143,10 @@ printf '%s\n' "$payload" | jq -c --arg host "$HOST" --arg hostBundleId "$HOST_BU
           else ($payload.last_assistant_message // "working") end)
     )
   } + $stats' >> "$OUT"
+
+# Stop and SubagentStop reject plain-text/empty stdout — they require a JSON
+# object on exit 0. Every other event ignores stdout, so this is safe to
+# print unconditionally for just these two.
+case "$EVENT" in
+  Stop|SubagentStop) printf '{}\n' ;;
+esac
