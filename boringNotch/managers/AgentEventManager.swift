@@ -139,8 +139,14 @@ final class AgentEventManager {
         let showLive = Defaults[.enableAgentLiveActivity]
         let decoder = JSONDecoder()
         var latest: AgentEvent?
+        var allEvents: [AgentEvent] = []
         for line in data.split(separator: UInt8(ascii: "\n")) {
             guard let event = try? decoder.decode(AgentEvent.self, from: Data(line)) else { continue }
+            // Always collect for session tracking
+            allEvents.append(event)
+            // Anti-spam: lifecycle start/end (SessionStart/SessionEnd) only
+            // manage the list — never pop a peek.
+            if event.lifecycle == "start" || event.lifecycle == "end" { continue }
             if event.kind == .working && !showLive { continue }
             latest = event
         }
@@ -151,6 +157,15 @@ final class AgentEventManager {
         if let handle = try? FileHandle(forWritingTo: eventsURL) {
             try? handle.truncate(atOffset: 0)
             try? handle.close()
+        }
+
+        // Forward all events to session manager for tracking.
+        if !allEvents.isEmpty {
+            DispatchQueue.main.async {
+                for event in allEvents {
+                    AgentSessionManager.shared.handleEvent(event)
+                }
+            }
         }
 
         guard let event = latest else { return }

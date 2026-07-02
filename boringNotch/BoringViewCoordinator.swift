@@ -122,6 +122,17 @@ struct AgentEvent: Codable {
     var project: String?   // basename(cwd)
     var cwd: String?
     var ts: Double?
+    // Activity + session stats — all optional; lightweight events omit them.
+    var tool: String?      // "Edit", "Write", "Bash", "WebSearch", …
+    var target: String?    // basename of edited file / search query
+    var tokensIn: Double?
+    var tokensOut: Double?
+    var filesChanged: Int?
+    var linesAdded: Int?
+    var linesRemoved: Int?
+    var turns: Int?
+    var sessionId: String?   // agent-provided session id (Claude Code)
+    var lifecycle: String?   // "start" / "end" — drives add/remove in the list
 
     private enum CodingKeys: String, CodingKey {
         case provider
@@ -132,6 +143,16 @@ struct AgentEvent: Codable {
         case project
         case cwd
         case ts
+        case tool
+        case target
+        case tokensIn
+        case tokensOut
+        case filesChanged
+        case linesAdded
+        case linesRemoved
+        case turns
+        case sessionId
+        case lifecycle
     }
 
     init(
@@ -142,7 +163,17 @@ struct AgentEvent: Codable {
         host: String? = nil,
         project: String? = nil,
         cwd: String? = nil,
-        ts: Double? = nil
+        ts: Double? = nil,
+        tool: String? = nil,
+        target: String? = nil,
+        tokensIn: Double? = nil,
+        tokensOut: Double? = nil,
+        filesChanged: Int? = nil,
+        linesAdded: Int? = nil,
+        linesRemoved: Int? = nil,
+        turns: Int? = nil,
+        sessionId: String? = nil,
+        lifecycle: String? = nil
     ) {
         self.provider = provider
         self.kind = kind
@@ -152,6 +183,16 @@ struct AgentEvent: Codable {
         self.project = project
         self.cwd = cwd
         self.ts = ts
+        self.tool = tool
+        self.target = target
+        self.tokensIn = tokensIn
+        self.tokensOut = tokensOut
+        self.filesChanged = filesChanged
+        self.linesAdded = linesAdded
+        self.linesRemoved = linesRemoved
+        self.turns = turns
+        self.sessionId = sessionId
+        self.lifecycle = lifecycle
     }
 
     init(from decoder: Decoder) throws {
@@ -165,12 +206,43 @@ struct AgentEvent: Codable {
         project = try? container.decode(String.self, forKey: .project)
         cwd = try? container.decode(String.self, forKey: .cwd)
         ts = try? container.decode(Double.self, forKey: .ts)
+        tool = try? container.decode(String.self, forKey: .tool)
+        target = try? container.decode(String.self, forKey: .target)
+        tokensIn = try? container.decode(Double.self, forKey: .tokensIn)
+        tokensOut = try? container.decode(Double.self, forKey: .tokensOut)
+        filesChanged = try? container.decode(Int.self, forKey: .filesChanged)
+        linesAdded = try? container.decode(Int.self, forKey: .linesAdded)
+        linesRemoved = try? container.decode(Int.self, forKey: .linesRemoved)
+        turns = try? container.decode(Int.self, forKey: .turns)
+        sessionId = try? container.decode(String.self, forKey: .sessionId)
+        lifecycle = try? container.decode(String.self, forKey: .lifecycle)
     }
 }
 
 struct AgentPeek {
     var show: Bool = false
     var event: AgentEvent? = nil
+}
+
+extension AgentEvent {
+    /// SF Symbol for the current activity, derived from `tool` when known,
+    /// else nil so callers can fall back to a status icon.
+    var activityGlyph: String? {
+        switch (tool ?? "").lowercased() {
+        case "edit", "write", "multiedit", "notebookedit":
+            return "doc.text"
+        case "read":
+            return "doc"
+        case "websearch", "webfetch":
+            return "globe"
+        case let t where t.hasPrefix("bash") && message.lowercased().contains("git"):
+            return "arrow.triangle.branch"
+        case let t where t.hasPrefix("bash"):
+            return "terminal"
+        default:
+            return nil
+        }
+    }
 }
 
 private extension String {

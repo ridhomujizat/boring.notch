@@ -206,6 +206,8 @@ class BoringViewModel: NSObject, ObservableObject {
         switch view {
         case .usage:
             return usageOpenNotchSize
+        case .sessions:
+            return sessionsOpenNotchSize
         case .home, .shelf:
             return openNotchSize
         }

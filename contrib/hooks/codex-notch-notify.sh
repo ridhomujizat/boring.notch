@@ -34,7 +34,19 @@ case "${TERM_PROGRAM:-}" in
   *)              HOST="${TERM_PROGRAM}" ;;
 esac
 
-printf '%s\n' "$payload" | jq -c --arg host "$HOST" '
+# Best-effort working-tree diff (Codex payload carries no token/diff data).
+CWD="$(printf '%s' "$payload" | jq -r '.cwd // .working_directory // .workingDirectory // ""')"
+[[ -z "$CWD" ]] && CWD="${PWD:-}"
+STATS='{}'
+if [[ -n "$CWD" ]] && git -C "$CWD" rev-parse --git-dir >/dev/null 2>&1; then
+  read -r A D F < <(git -C "$CWD" diff HEAD --numstat 2>/dev/null | awk '
+    { if ($1 ~ /^[0-9]+$/) a += $1; if ($2 ~ /^[0-9]+$/) d += $2; f++ }
+    END { print a+0, d+0, f+0 }')
+  STATS="$(jq -c -n --argjson a "${A:-0}" --argjson d "${D:-0}" --argjson f "${F:-0}" \
+    '{linesAdded:$a, linesRemoved:$d, filesChanged:$f}')"
+fi
+
+printf '%s\n' "$payload" | jq -c --arg host "$HOST" --argjson stats "$STATS" '
   . as $payload |
   (($payload.type // $payload.event // $payload.kind // "") | tostring | ascii_downcase) as $event |
   ($payload.cwd // $payload.working_directory // $payload.workingDirectory // env.PWD // null) as $cwd |
@@ -60,4 +72,4 @@ printf '%s\n' "$payload" | jq -c --arg host "$HOST" '
           elif $kind == "error" then "failed"
           else "working" end)
     )
-  }' >> "$OUT"
+  } + $stats' >> "$OUT"

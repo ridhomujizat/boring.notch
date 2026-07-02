@@ -383,6 +383,8 @@ struct ContentView: View {
                         ShelfView()
                     case .usage:
                         UsageView()
+                    case .sessions:
+                        SessionsView()
                     }
                 }
                 .transition(
@@ -618,6 +620,10 @@ struct ContentView: View {
 
     private func handleUpGesture(translation: CGFloat, phase: NSEvent.Phase) {
         guard vm.notchState == .open && !vm.isHoveringCalendar else { return }
+        // Sessions tab is a scrollable list — don't treat scrolling it as a
+        // close swipe. ponytail: gated per-tab; generalize if other scrollable
+        // tabs hit the same conflict.
+        if coordinator.currentView == .sessions { return }
 
         withAnimation(animationSpring) {
             gestureProgress = (translation / Defaults[.gestureSensitivity]) * -20

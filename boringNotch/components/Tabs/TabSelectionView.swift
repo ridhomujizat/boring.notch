@@ -18,16 +18,27 @@ struct TabModel: Identifiable {
 let tabs = [
     TabModel(label: "Home", icon: "house.fill", view: .home),
     TabModel(label: "Shelf", icon: "tray.fill", view: .shelf),
+    TabModel(label: "Sessions", icon: "terminal.fill", view: .sessions),
     TabModel(label: "Usage", icon: "gauge.with.dots.needle.67percent", view: .usage)
 ]
 
 struct TabSelectionView: View {
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @Default(.enableUsageTab) var enableUsageTab
+    @Default(.enableSessionsTab) var enableSessionsTab
+    @Default(.enableShelfTab) var enableShelfTab
+    @Default(.enableAgentPeek) var enableAgentPeek
     @Namespace var animation
     var body: some View {
         HStack(spacing: 0) {
-            ForEach(tabs.filter { $0.view != .usage || enableUsageTab }) { tab in
+            ForEach(tabs.filter { tab in
+                switch tab.view {
+                case .usage: return enableUsageTab
+                case .sessions: return enableSessionsTab && enableAgentPeek
+                case .shelf: return enableShelfTab
+                case .home: return true
+                }
+            }) { tab in
                     TabButton(label: tab.label, icon: tab.icon, selected: coordinator.currentView == tab.view) {
                         withAnimation(.smooth) {
                             coordinator.currentView = tab.view

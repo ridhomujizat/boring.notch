@@ -206,5 +206,7 @@ extension Defaults.Keys {
 
     // MARK: AI Usage (Claude Code / Codex live quota)
     static let enableUsageTab = Key<Bool>("enableUsageTab", default: true)
+    static let enableSessionsTab = Key<Bool>("enableSessionsTab", default: true)
+    static let enableShelfTab = Key<Bool>("enableShelfTab", default: true)
     static let usageRefreshInterval = Key<Double>("usageRefreshInterval", default: 300)
 }

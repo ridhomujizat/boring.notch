@@ -24,6 +24,9 @@ struct AgentSneakPeekView: View {
     }
 
     private var icon: String {
+        // Prefer the activity-type glyph (matches the Sessions list); fall back
+        // to a status icon when the tool is unknown.
+        if let glyph = event?.activityGlyph { return glyph }
         switch event?.kind {
         case .needsInput: return "pencil"
         case .done: return "checkmark.circle.fill"
@@ -71,7 +74,7 @@ struct AgentSneakPeekView: View {
                 .constant(text),
                 font: .caption,
                 nsFont: .caption1,
-                textColor: .gray,
+                textColor: tint,
                 minDuration: 1,
                 frameWidth: marqueeWidth
             )

@@ -193,6 +193,24 @@ struct GeneralSettings: View {
             }
 
             Section {
+                Defaults.Toggle(key: .enableShelfTab) {
+                    Text("Shelf")
+                }
+                Defaults.Toggle(key: .enableSessionsTab) {
+                    Text("Sessions")
+                }
+                Defaults.Toggle(key: .enableUsageTab) {
+                    Text("Usage")
+                }
+                Text("Home is always shown. The Sessions tab also needs \u{201C}Show coding-agent sneak peek\u{201D} enabled (HUDs settings).")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            } header: {
+                Text("Tabs")
+            }
+
+            Section {
                 Picker(
                     selection: $notchHeightMode,
                     label:

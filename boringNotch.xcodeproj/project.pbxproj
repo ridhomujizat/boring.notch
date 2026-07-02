@@ -84,6 +84,8 @@
 		AA1A0000000000000000AA06 /* AgentEventManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1A0000000000000000AA05 /* AgentEventManager.swift */; };
 		AA1A0000000000000000AA10 /* AgentNotificationSetupManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1A0000000000000000AA09 /* AgentNotificationSetupManager.swift */; };
 		AA1A0000000000000000AA04 /* UsageView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1A0000000000000000AA03 /* UsageView.swift */; };
+		AA1A0000000000000000BB02 /* AgentSessionManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1A0000000000000000BB01 /* AgentSessionManager.swift */; };
+		AA1A0000000000000000BB04 /* SessionsView.swift in Sources */ = {isa = PBXBuildFile; fileRef = AA1A0000000000000000BB03 /* SessionsView.swift */; };
 		1471A8592C6281BD0058408D /* BoringNotchWindow.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1471A8582C6281BD0058408D /* BoringNotchWindow.swift */; };
 		149E0B972C737D00006418B1 /* WebcamManager.swift in Sources */ = {isa = PBXBuildFile; fileRef = 149E0B962C737D00006418B1 /* WebcamManager.swift */; };
 		149E0B9A2C737D40006418B1 /* WebcamView.swift in Sources */ = {isa = PBXBuildFile; fileRef = 149E0B992C737D40006418B1 /* WebcamView.swift */; };
@@ -257,6 +259,8 @@
 		AA1A0000000000000000AA05 /* AgentEventManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentEventManager.swift; sourceTree = "<group>"; };
 		AA1A0000000000000000AA09 /* AgentNotificationSetupManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentNotificationSetupManager.swift; sourceTree = "<group>"; };
 		AA1A0000000000000000AA03 /* UsageView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Usage/UsageView.swift; sourceTree = "<group>"; };
+		AA1A0000000000000000BB01 /* AgentSessionManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = AgentSessionManager.swift; sourceTree = "<group>"; };
+		AA1A0000000000000000BB03 /* SessionsView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = Sessions/SessionsView.swift; sourceTree = "<group>"; };
 		1471A8582C6281BD0058408D /* BoringNotchWindow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BoringNotchWindow.swift; sourceTree = "<group>"; };
 		149E0B962C737D00006418B1 /* WebcamManager.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebcamManager.swift; sourceTree = "<group>"; };
 		149E0B992C737D40006418B1 /* WebcamView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WebcamView.swift; sourceTree = "<group>"; };
@@ -514,6 +518,7 @@
 				507266DA2C908E2E00A2D00D /* HoverButton.swift */,
 				B1F747F82EC7E94000F841DB /* LottieView.swift */,
 				AA1A0000000000000000AA03 /* UsageView.swift */,
+				AA1A0000000000000000BB03 /* SessionsView.swift */,
 			);
 			path = components;
 			sourceTree = "<group>";
@@ -528,6 +533,7 @@
 				AA1A0000000000000000AA01 /* AIUsageManager.swift */,
 				AA1A0000000000000000AA05 /* AgentEventManager.swift */,
 				AA1A0000000000000000AA09 /* AgentNotificationSetupManager.swift */,
+				AA1A0000000000000000BB01 /* AgentSessionManager.swift */,
 				149E0B962C737D00006418B1 /* WebcamManager.swift */,
 				14C08BB52C8DE42D000F8AA0 /* CalendarManager.swift */,
 				B1F0A0012E60000100000001 /* BrightnessManager.swift */,
@@ -924,6 +930,8 @@
 				AA1A0000000000000000AA06 /* AgentEventManager.swift in Sources */,
 				AA1A0000000000000000AA10 /* AgentNotificationSetupManager.swift in Sources */,
 				AA1A0000000000000000AA04 /* UsageView.swift in Sources */,
+				AA1A0000000000000000BB02 /* AgentSessionManager.swift in Sources */,
+				AA1A0000000000000000BB04 /* SessionsView.swift in Sources */,
 				115C12EC2ED3D003009754CA /* OpenNotchHUD.swift in Sources */,
 				14C08BB92C8DE4B1000F8AA0 /* BoringCalendar.swift in Sources */,
 				5955950D2E900ED800C66711 /* ApplicationRelauncher.swift in Sources */,
