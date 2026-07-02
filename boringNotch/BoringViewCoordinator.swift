@@ -229,7 +229,7 @@ extension AgentEvent {
     /// else nil so callers can fall back to a status icon.
     var activityGlyph: String? {
         switch (tool ?? "").lowercased() {
-        case "edit", "write", "multiedit", "notebookedit":
+        case "edit", "write", "multiedit", "notebookedit", "apply_patch":
             return "doc.text"
         case "read":
             return "doc"

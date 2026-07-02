@@ -23,8 +23,9 @@ enum AgentNotificationSetupManager {
         switch target {
         case .codex:
             let hookURL = try installScript(named: "codex-notch-notify.sh", contents: codexHookScript)
-            let configURL = try updateCodexConfig(hookURL: hookURL)
-            return AgentNotificationSetupResult(message: "Codex setup saved to \(displayPath(configURL)).")
+            let hooksURL = try updateCodexHooks(hookURL: hookURL)
+            try removeManagedCodexNotify(hookURL: hookURL)
+            return AgentNotificationSetupResult(message: "Codex hooks saved to \(displayPath(hooksURL)). Review with /hooks if Codex prompts.")
         case .claudeCode:
             let hookURL = try installScript(named: "claude-notch-hook.sh", contents: claudeHookScript)
             let settingsURL = try updateClaudeSettings(hookURL: hookURL)
@@ -49,6 +50,11 @@ enum AgentNotificationSetupManager {
             .appendingPathComponent("config.toml")
     }
 
+    private static var codexHooksURL: URL {
+        UserHome.url.appendingPathComponent(".codex", isDirectory: true)
+            .appendingPathComponent("hooks.json")
+    }
+
     private static var claudeSettingsURL: URL {
         UserHome.url.appendingPathComponent(".claude", isDirectory: true)
             .appendingPathComponent("settings.json")
@@ -69,19 +75,105 @@ enum AgentNotificationSetupManager {
         return scriptURL
     }
 
-    private static func updateCodexConfig(hookURL: URL) throws -> URL {
+    private static func updateCodexHooks(hookURL: URL) throws -> URL {
+        let hooksURL = codexHooksURL
+        try FileManager.default.createDirectory(at: hooksURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+
+        var root = try readJSONObject(at: hooksURL)
+        var hooks = root["hooks"] as? [String: Any] ?? [:]
+
+        upsertCommandHook(
+            to: &hooks,
+            event: "SessionStart",
+            matcher: "startup|resume|clear|compact",
+            command: hookURL.path,
+            scriptName: hookURL.lastPathComponent
+        )
+        upsertCommandHook(
+            to: &hooks,
+            event: "UserPromptSubmit",
+            matcher: nil,
+            command: hookURL.path,
+            scriptName: hookURL.lastPathComponent
+        )
+        upsertCommandHook(
+            to: &hooks,
+            event: "PermissionRequest",
+            matcher: "*",
+            command: hookURL.path,
+            scriptName: hookURL.lastPathComponent
+        )
+        upsertCommandHook(
+            to: &hooks,
+            event: "PreToolUse",
+            matcher: "Bash|apply_patch|Edit|Write|mcp__.*",
+            command: hookURL.path,
+            scriptName: hookURL.lastPathComponent
+        )
+        upsertCommandHook(
+            to: &hooks,
+            event: "PostToolUse",
+            matcher: "Bash|apply_patch|Edit|Write|mcp__.*",
+            command: hookURL.path,
+            scriptName: hookURL.lastPathComponent
+        )
+        upsertCommandHook(
+            to: &hooks,
+            event: "PreCompact",
+            matcher: "manual|auto",
+            command: hookURL.path,
+            scriptName: hookURL.lastPathComponent
+        )
+        upsertCommandHook(
+            to: &hooks,
+            event: "PostCompact",
+            matcher: "manual|auto",
+            command: hookURL.path,
+            scriptName: hookURL.lastPathComponent
+        )
+        upsertCommandHook(
+            to: &hooks,
+            event: "SubagentStart",
+            matcher: nil,
+            command: hookURL.path,
+            scriptName: hookURL.lastPathComponent
+        )
+        upsertCommandHook(
+            to: &hooks,
+            event: "SubagentStop",
+            matcher: nil,
+            command: hookURL.path,
+            scriptName: hookURL.lastPathComponent
+        )
+        upsertCommandHook(
+            to: &hooks,
+            event: "Stop",
+            matcher: nil,
+            command: hookURL.path,
+            scriptName: hookURL.lastPathComponent
+        )
+
+        root["hooks"] = hooks
+
+        let data = try JSONSerialization.data(withJSONObject: root, options: [.prettyPrinted, .sortedKeys])
+        try data.write(to: hooksURL, options: [.atomic])
+        return hooksURL
+    }
+
+    private static func removeManagedCodexNotify(hookURL: URL) throws {
         let configURL = codexConfigURL
-        try FileManager.default.createDirectory(at: configURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        guard FileManager.default.fileExists(atPath: configURL.path) else { return }
 
         let current = (try? String(contentsOf: configURL, encoding: .utf8)) ?? ""
-        let notifyLine = "notify = [\"\(tomlEscaped(hookURL.path))\"]"
-        let updated = upsertTopLevelTomlLine(key: "notify", line: notifyLine, in: current)
+        let updated = removeTopLevelTomlLine(
+            key: "notify",
+            containingAny: [hookURL.path, hookURL.lastPathComponent],
+            in: current
+        )
 
         if updated != current {
             try updated.write(to: configURL, atomically: true, encoding: .utf8)
         }
-
-        return configURL
     }
 
     private static func updateClaudeSettings(hookURL: URL) throws -> URL {
@@ -91,42 +183,42 @@ enum AgentNotificationSetupManager {
         var root = try readJSONObject(at: settingsURL)
         var hooks = root["hooks"] as? [String: Any] ?? [:]
 
-        appendClaudeHook(
+        upsertCommandHook(
             to: &hooks,
             event: "Stop",
             matcher: nil,
             command: hookURL.path,
             scriptName: hookURL.lastPathComponent
         )
-        appendClaudeHook(
+        upsertCommandHook(
             to: &hooks,
             event: "Notification",
             matcher: "",
             command: hookURL.path,
             scriptName: hookURL.lastPathComponent
         )
-        appendClaudeHook(
+        upsertCommandHook(
             to: &hooks,
             event: "UserPromptSubmit",
             matcher: nil,
             command: hookURL.path,
             scriptName: hookURL.lastPathComponent
         )
-        appendClaudeHook(
+        upsertCommandHook(
             to: &hooks,
             event: "PostToolUse",
             matcher: "Edit|Write|Bash",
             command: hookURL.path,
             scriptName: hookURL.lastPathComponent
         )
-        appendClaudeHook(
+        upsertCommandHook(
             to: &hooks,
             event: "SessionStart",
             matcher: nil,
             command: hookURL.path,
             scriptName: hookURL.lastPathComponent
         )
-        appendClaudeHook(
+        upsertCommandHook(
             to: &hooks,
             event: "SessionEnd",
             matcher: nil,
@@ -155,7 +247,7 @@ enum AgentNotificationSetupManager {
         return dictionary
     }
 
-    private static func appendClaudeHook(
+    private static func upsertCommandHook(
         to hooks: inout [String: Any],
         event: String,
         matcher: String?,
@@ -163,10 +255,7 @@ enum AgentNotificationSetupManager {
         scriptName: String
     ) {
         var entries = hookEntries(from: hooks[event])
-        guard !entries.contains(where: { containsCommand($0, command: command, scriptName: scriptName) }) else {
-            hooks[event] = entries
-            return
-        }
+        entries.removeAll { containsCommand($0, command: command, scriptName: scriptName) }
 
         var entry: [String: Any] = [
             "hooks": [
@@ -203,36 +292,28 @@ enum AgentNotificationSetupManager {
         }
     }
 
-    private static func upsertTopLevelTomlLine(key: String, line: String, in contents: String) -> String {
-        guard !contents.isEmpty else {
-            return line + "\n"
-        }
-
+    private static func removeTopLevelTomlLine(key: String, containingAny needles: [String], in contents: String) -> String {
+        guard !contents.isEmpty else { return contents }
         var lines = contents.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
         let firstSectionIndex = lines.firstIndex { line in
             line.trimmingCharacters(in: .whitespaces).hasPrefix("[")
         } ?? lines.count
 
-        if let existingIndex = lines[..<firstSectionIndex].firstIndex(where: { line in
+        let indexesToRemove = lines[..<firstSectionIndex].indices.filter { index in
+            let line = lines[index]
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            return trimmed.hasPrefix("\(key) ") || trimmed.hasPrefix("\(key)=")
-        }) {
-            lines[existingIndex] = line
-        } else {
-            lines.insert(line, at: firstSectionIndex)
-            if firstSectionIndex < lines.count, lines[safe: firstSectionIndex + 1] != "" {
-                lines.insert("", at: firstSectionIndex + 1)
-            }
+            let matchesKey = trimmed.hasPrefix("\(key) ") || trimmed.hasPrefix("\(key)=")
+            return matchesKey && needles.contains { line.contains($0) }
+        }
+        guard !indexesToRemove.isEmpty else { return contents }
+
+        for index in indexesToRemove.reversed() {
+            lines.remove(at: index)
         }
 
         let joined = lines.joined(separator: "\n")
+        guard !joined.isEmpty else { return "" }
         return joined.hasSuffix("\n") ? joined : joined + "\n"
-    }
-
-    private static func tomlEscaped(_ value: String) -> String {
-        value
-            .replacingOccurrences(of: "\\", with: "\\\\")
-            .replacingOccurrences(of: "\"", with: "\\\"")
     }
 
     private static func displayPath(_ url: URL) -> String {
@@ -346,6 +427,10 @@ if [[ -z "$payload" ]]; then
   payload='{}'
 fi
 
+if ! printf '%s' "$payload" | jq -e . >/dev/null 2>&1; then
+  payload="$(jq -c -n --arg message "$payload" '{type:"notification", message:$message}')"
+fi
+
 case "${TERM_PROGRAM:-}" in
   ghostty)        HOST=Ghostty ;;
   vscode)         HOST="VS Code" ;;
@@ -363,23 +448,69 @@ esac
 
 CWD="$(printf '%s' "$payload" | jq -r '.cwd // .working_directory // .workingDirectory // ""')"
 [[ -z "$CWD" ]] && CWD="${PWD:-}"
+EVENT="$(printf '%s' "$payload" | jq -r '.hook_event_name // .type // .event // .kind // ""')"
+TRANSCRIPT="$(printf '%s' "$payload" | jq -r '.transcript_path // ""')"
+
 STATS='{}'
-if [[ -n "$CWD" ]] && git -C "$CWD" rev-parse --git-dir >/dev/null 2>&1; then
-  read -r A D F < <(git -C "$CWD" diff HEAD --numstat 2>/dev/null | awk '
-    { if ($1 ~ /^[0-9]+$/) a += $1; if ($2 ~ /^[0-9]+$/) d += $2; f++ }
-    END { print a+0, d+0, f+0 }')
-  STATS="$(jq -c -n --argjson a "${A:-0}" --argjson d "${D:-0}" --argjson f "${F:-0}" \
-    '{linesAdded:$a, linesRemoved:$d, filesChanged:$f}')"
+event_key="$(printf '%s' "$EVENT" | tr '[:upper:]' '[:lower:]')"
+if [[ "$event_key" =~ stop|done|complete|finish|permission|approval|input|notify|notification ]]; then
+  TOK='{}'
+  if [[ -n "$TRANSCRIPT" && -f "$TRANSCRIPT" ]]; then
+    TOK="$(jq -s '
+      def usages:
+        .. | objects | .usage? // empty | objects;
+      {
+        tokensIn: ([usages |
+          (.input_tokens // .inputTokens // .prompt_tokens // .promptTokens // 0)
+          + (.cache_read_input_tokens // 0)
+          + (.cache_creation_input_tokens // 0)
+          + (.cached_tokens // 0)
+        ] | add // 0),
+        tokensOut: ([usages |
+          (.output_tokens // .outputTokens // .completion_tokens // .completionTokens // 0)
+        ] | add // 0),
+        turns: ([.. | objects |
+          select((.role? == "user") or (.type? == "user") or (.message?.role? == "user"))
+        ] | length)
+      } | with_entries(select(.value != 0))
+    ' "$TRANSCRIPT" 2>/dev/null || echo '{}')"
+  fi
+
+  DIFF='{}'
+  if [[ -n "$CWD" ]] && git -C "$CWD" rev-parse --git-dir >/dev/null 2>&1; then
+    read -r A D F < <(git -C "$CWD" diff HEAD --numstat 2>/dev/null | awk '
+      { if ($1 ~ /^[0-9]+$/) a += $1; if ($2 ~ /^[0-9]+$/) d += $2; f++ }
+      END { print a+0, d+0, f+0 }')
+    DIFF="$(jq -c -n --argjson a "${A:-0}" --argjson d "${D:-0}" --argjson f "${F:-0}" \
+      '{linesAdded:$a, linesRemoved:$d, filesChanged:$f}')"
+  fi
+
+  STATS="$(jq -c -n --argjson t "$TOK" --argjson d "$DIFF" '$t + $d')"
 fi
 
 printf '%s\n' "$payload" | jq -c --arg host "$HOST" --argjson stats "$STATS" '
   . as $payload |
-  (($payload.type // $payload.event // $payload.kind // "") | tostring | ascii_downcase) as $event |
+  ($payload.hook_event_name // $payload.type // $payload.event // $payload.kind // "") as $eventRaw |
+  ($eventRaw | tostring | ascii_downcase) as $event |
   ($payload.cwd // $payload.working_directory // $payload.workingDirectory // env.PWD // null) as $cwd |
-  (if ($event | test("approval|input|permission|notify|notification")) then "needsInput"
+  ($payload.tool_name // $payload.tool // null) as $tool |
+  ($payload.tool_input.file_path? // $payload.tool_input.path? // $payload.tool_input.uri? // "") as $fp |
+  (if $fp == "" then null else ($fp | split("/") | last) end) as $target |
+  (if $event == "sessionstart" then "start"
+   elif $event == "sessionend" then "end"
+   else null end) as $lifecycle |
+  (if ($event == "permissionrequest") or ($event | test("approval|input|permission|notify|notification")) then "needsInput"
    elif ($event | test("error|fail")) then "error"
-   elif ($event | test("done|complete|finish|stop")) then "done"
+   elif ($event == "stop") or ($event == "sessionend") or ($event | test("done|complete|finish")) then "done"
    else "working" end) as $kind |
+  def toolMessage($prefix):
+    if (($tool // "") | ascii_downcase) == "apply_patch" then "Editing files"
+    elif (($tool // "") | test("^mcp__")) then "Using MCP tool"
+    elif (($tool // "") | ascii_downcase) == "bash" then "Running command"
+    elif (($tool // "") | ascii_downcase) == "read" then ("Reading " + ($target // "a file"))
+    elif (($tool // "") | ascii_downcase | test("edit|write")) then ("Editing " + ($target // "a file"))
+    elif ($tool // "") != "" then ($prefix + " " + $tool)
+    else "working" end;
   {
     provider: "codex",
     title: "Codex",
@@ -387,16 +518,28 @@ printf '%s\n' "$payload" | jq -c --arg host "$HOST" --argjson stats "$STATS" '
     project: (if $cwd then ($cwd | split("/") | last) else null end),
     cwd: $cwd,
     ts: (now | floor),
+    tool: $tool,
+    target: $target,
+    sessionId: ($payload.session_id // $payload.sessionId // null),
+    lifecycle: $lifecycle,
     kind: $kind,
     message: (
       $payload.message
       // $payload.summary
       // $payload.title
-      // $payload.last_assistant_message
-      // (if $kind == "needsInput" then "needs your input"
+      // (if $event == "sessionstart" then "started"
+          elif $event == "userpromptsubmit" then "working..."
+          elif $event == "permissionrequest" then ("needs approval" + (if $tool then ": " + $tool else "" end))
+          elif $event == "pretooluse" then toolMessage("Starting")
+          elif $event == "posttooluse" then toolMessage("Ran")
+          elif $event == "precompact" then "compacting context"
+          elif $event == "postcompact" then "compacted context"
+          elif $event == "subagentstart" then "subagent started"
+          elif $event == "subagentstop" then "subagent finished"
+          elif $kind == "needsInput" then "needs your input"
           elif $kind == "done" then "finished"
           elif $kind == "error" then "failed"
-          else "working" end)
+          else ($payload.last_assistant_message // "working") end)
     )
   } + $stats' >> "$OUT"
 """

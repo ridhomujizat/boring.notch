@@ -46,9 +46,11 @@ Provider-specific mapping lives in these small scripts.
 
 ## Codex
 
-Codex's `notify` config invokes a program with a JSON argument.
-`codex-notch-notify.sh` maps that to the **same** line with `provider:"codex"`
-and appends to the same file.
+Codex hooks invoke a command with hook JSON on stdin. `codex-notch-notify.sh`
+maps lifecycle events to the **same** line with `provider:"codex"` and appends
+to the same file. The script also accepts the older `notify` JSON argument for
+backwards compatibility, but hooks are required for full session/activity
+coverage.
 
 1. Enable it in the app: **Settings -> HUDs -> Agent Activity -> Show
    coding-agent sneak peek**. Enable **Include live activity** too if you want
@@ -61,7 +63,27 @@ and appends to the same file.
    chmod +x ~/.config/boring-notch/hooks/codex-notch-notify.sh
    ```
 
-3. Point Codex's `notify` command to the installed script.
+3. Register it in `~/.codex/hooks.json` (merge into any existing `hooks`):
+
+   ```json
+   {
+     "hooks": {
+       "SessionStart":      [{ "matcher": "startup|resume|clear|compact", "hooks": [{ "type": "command", "command": "~/.config/boring-notch/hooks/codex-notch-notify.sh" }] }],
+       "UserPromptSubmit":  [{ "hooks": [{ "type": "command", "command": "~/.config/boring-notch/hooks/codex-notch-notify.sh" }] }],
+       "PermissionRequest": [{ "matcher": "*", "hooks": [{ "type": "command", "command": "~/.config/boring-notch/hooks/codex-notch-notify.sh" }] }],
+       "PreToolUse":        [{ "matcher": "Bash|apply_patch|Edit|Write|mcp__.*", "hooks": [{ "type": "command", "command": "~/.config/boring-notch/hooks/codex-notch-notify.sh" }] }],
+       "PostToolUse":       [{ "matcher": "Bash|apply_patch|Edit|Write|mcp__.*", "hooks": [{ "type": "command", "command": "~/.config/boring-notch/hooks/codex-notch-notify.sh" }] }],
+       "PreCompact":        [{ "matcher": "manual|auto", "hooks": [{ "type": "command", "command": "~/.config/boring-notch/hooks/codex-notch-notify.sh" }] }],
+       "PostCompact":       [{ "matcher": "manual|auto", "hooks": [{ "type": "command", "command": "~/.config/boring-notch/hooks/codex-notch-notify.sh" }] }],
+       "SubagentStart":     [{ "hooks": [{ "type": "command", "command": "~/.config/boring-notch/hooks/codex-notch-notify.sh" }] }],
+       "SubagentStop":      [{ "hooks": [{ "type": "command", "command": "~/.config/boring-notch/hooks/codex-notch-notify.sh" }] }],
+       "Stop":              [{ "hooks": [{ "type": "command", "command": "~/.config/boring-notch/hooks/codex-notch-notify.sh" }] }]
+     }
+   }
+   ```
+
+   Codex may ask you to review and trust changed hooks. Run `/hooks` in Codex
+   and approve the boring.notch hook if prompted.
 
 ## Test without an agent
 

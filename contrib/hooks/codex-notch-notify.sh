@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# codex-notch-notify.sh - map a Codex notify payload to a normalized
+# codex-notch-notify.sh - map Codex hook/notify payloads to a normalized
 # AgentEvent line and append it to the file boring.notch watches.
 #
-# Install: copy to ~/.config/boring-notch/hooks/, chmod +x, then point Codex's
-# notify command at this script. Accepts JSON as the first argument or on stdin.
-# Requires: jq.
+# Install: copy to ~/.config/boring-notch/hooks/, chmod +x, then register it in
+# Codex hooks.json. Accepts hook JSON on stdin, and legacy notify JSON as the
+# first argument or on stdin. Requires: jq.
 set -euo pipefail
 
 OUT="$HOME/.config/boring-notch/events.jsonl"
@@ -17,6 +17,10 @@ fi
 
 if [[ -z "$payload" ]]; then
   payload='{}'
+fi
+
+if ! printf '%s' "$payload" | jq -e . >/dev/null 2>&1; then
+  payload="$(jq -c -n --arg message "$payload" '{type:"notification", message:$message}')"
 fi
 
 case "${TERM_PROGRAM:-}" in
@@ -34,26 +38,72 @@ case "${TERM_PROGRAM:-}" in
   *)              HOST="${TERM_PROGRAM}" ;;
 esac
 
-# Best-effort working-tree diff (Codex payload carries no token/diff data).
 CWD="$(printf '%s' "$payload" | jq -r '.cwd // .working_directory // .workingDirectory // ""')"
 [[ -z "$CWD" ]] && CWD="${PWD:-}"
+EVENT="$(printf '%s' "$payload" | jq -r '.hook_event_name // .type // .event // .kind // ""')"
+TRANSCRIPT="$(printf '%s' "$payload" | jq -r '.transcript_path // ""')"
+
+# Heavy stats only at turn/input boundaries. Tool hooks can fire frequently.
 STATS='{}'
-if [[ -n "$CWD" ]] && git -C "$CWD" rev-parse --git-dir >/dev/null 2>&1; then
-  read -r A D F < <(git -C "$CWD" diff HEAD --numstat 2>/dev/null | awk '
-    { if ($1 ~ /^[0-9]+$/) a += $1; if ($2 ~ /^[0-9]+$/) d += $2; f++ }
-    END { print a+0, d+0, f+0 }')
-  STATS="$(jq -c -n --argjson a "${A:-0}" --argjson d "${D:-0}" --argjson f "${F:-0}" \
-    '{linesAdded:$a, linesRemoved:$d, filesChanged:$f}')"
+event_key="$(printf '%s' "$EVENT" | tr '[:upper:]' '[:lower:]')"
+if [[ "$event_key" =~ stop|done|complete|finish|permission|approval|input|notify|notification ]]; then
+  TOK='{}'
+  if [[ -n "$TRANSCRIPT" && -f "$TRANSCRIPT" ]]; then
+    TOK="$(jq -s '
+      def usages:
+        .. | objects | .usage? // empty | objects;
+      {
+        tokensIn: ([usages |
+          (.input_tokens // .inputTokens // .prompt_tokens // .promptTokens // 0)
+          + (.cache_read_input_tokens // 0)
+          + (.cache_creation_input_tokens // 0)
+          + (.cached_tokens // 0)
+        ] | add // 0),
+        tokensOut: ([usages |
+          (.output_tokens // .outputTokens // .completion_tokens // .completionTokens // 0)
+        ] | add // 0),
+        turns: ([.. | objects |
+          select((.role? == "user") or (.type? == "user") or (.message?.role? == "user"))
+        ] | length)
+      } | with_entries(select(.value != 0))
+    ' "$TRANSCRIPT" 2>/dev/null || echo '{}')"
+  fi
+
+  DIFF='{}'
+  if [[ -n "$CWD" ]] && git -C "$CWD" rev-parse --git-dir >/dev/null 2>&1; then
+    read -r A D F < <(git -C "$CWD" diff HEAD --numstat 2>/dev/null | awk '
+      { if ($1 ~ /^[0-9]+$/) a += $1; if ($2 ~ /^[0-9]+$/) d += $2; f++ }
+      END { print a+0, d+0, f+0 }')
+    DIFF="$(jq -c -n --argjson a "${A:-0}" --argjson d "${D:-0}" --argjson f "${F:-0}" \
+      '{linesAdded:$a, linesRemoved:$d, filesChanged:$f}')"
+  fi
+
+  STATS="$(jq -c -n --argjson t "$TOK" --argjson d "$DIFF" '$t + $d')"
 fi
 
 printf '%s\n' "$payload" | jq -c --arg host "$HOST" --argjson stats "$STATS" '
   . as $payload |
-  (($payload.type // $payload.event // $payload.kind // "") | tostring | ascii_downcase) as $event |
+  ($payload.hook_event_name // $payload.type // $payload.event // $payload.kind // "") as $eventRaw |
+  ($eventRaw | tostring | ascii_downcase) as $event |
   ($payload.cwd // $payload.working_directory // $payload.workingDirectory // env.PWD // null) as $cwd |
-  (if ($event | test("approval|input|permission|notify|notification")) then "needsInput"
+  ($payload.tool_name // $payload.tool // null) as $tool |
+  ($payload.tool_input.file_path? // $payload.tool_input.path? // $payload.tool_input.uri? // "") as $fp |
+  (if $fp == "" then null else ($fp | split("/") | last) end) as $target |
+  (if $event == "sessionstart" then "start"
+   elif $event == "sessionend" then "end"
+   else null end) as $lifecycle |
+  (if ($event == "permissionrequest") or ($event | test("approval|input|permission|notify|notification")) then "needsInput"
+   elif ($event == "stop") or ($event == "sessionend") or ($event | test("done|complete|finish")) then "done"
    elif ($event | test("error|fail")) then "error"
-   elif ($event | test("done|complete|finish|stop")) then "done"
    else "working" end) as $kind |
+  def toolMessage($prefix):
+    if (($tool // "") | ascii_downcase) == "apply_patch" then "Editing files"
+    elif (($tool // "") | test("^mcp__")) then "Using MCP tool"
+    elif (($tool // "") | ascii_downcase) == "bash" then "Running command"
+    elif (($tool // "") | ascii_downcase) == "read" then ("Reading " + ($target // "a file"))
+    elif (($tool // "") | ascii_downcase | test("edit|write")) then ("Editing " + ($target // "a file"))
+    elif ($tool // "") != "" then ($prefix + " " + $tool)
+    else "working" end;
   {
     provider: "codex",
     title: "Codex",
@@ -61,15 +111,27 @@ printf '%s\n' "$payload" | jq -c --arg host "$HOST" --argjson stats "$STATS" '
     project: (if $cwd then ($cwd | split("/") | last) else null end),
     cwd: $cwd,
     ts: (now | floor),
+    tool: $tool,
+    target: $target,
+    sessionId: ($payload.session_id // $payload.sessionId // null),
+    lifecycle: $lifecycle,
     kind: $kind,
     message: (
       $payload.message
       // $payload.summary
       // $payload.title
-      // $payload.last_assistant_message
-      // (if $kind == "needsInput" then "needs your input"
+      // (if $event == "sessionstart" then "started"
+          elif $event == "userpromptsubmit" then "working..."
+          elif $event == "permissionrequest" then ("needs approval" + (if $tool then ": " + $tool else "" end))
+          elif $event == "pretooluse" then toolMessage("Starting")
+          elif $event == "posttooluse" then toolMessage("Ran")
+          elif $event == "precompact" then "compacting context"
+          elif $event == "postcompact" then "compacted context"
+          elif $event == "subagentstart" then "subagent started"
+          elif $event == "subagentstop" then "subagent finished"
+          elif $kind == "needsInput" then "needs your input"
           elif $kind == "done" then "finished"
           elif $kind == "error" then "failed"
-          else "working" end)
+          else ($payload.last_assistant_message // "working") end)
     )
   } + $stats' >> "$OUT"

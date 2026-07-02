@@ -625,7 +625,7 @@ struct HUD: View {
                     .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Text("Pops a peek when Claude Code / Codex finishes, needs approval, or (optionally) works. Use setup buttons to install the hooks. Requires jq.")
+                Text("Pops a peek when Claude Code / Codex finishes, needs approval, or (optionally) works. Use setup buttons to install the hooks. Requires jq. Codex may ask you to trust hooks with /hooks.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

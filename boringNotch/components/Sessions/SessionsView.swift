@@ -145,7 +145,7 @@ private struct SessionRowView: View {
     /// when known, otherwise from status.
     private var activityGlyph: String {
         switch (session.tool ?? "").lowercased() {
-        case "edit", "write", "multiedit", "notebookedit":
+        case "edit", "write", "multiedit", "notebookedit", "apply_patch":
             return "doc.text"
         case "read":
             return "doc"
@@ -175,7 +175,7 @@ private struct SessionRowView: View {
         guard let tool = session.tool?.lowercased() else { return session.currentTask }
         let target = session.target
         switch tool {
-        case "edit", "multiedit":  return target.map { "Editing \($0)" } ?? session.currentTask
+        case "edit", "multiedit", "apply_patch": return target.map { "Editing \($0)" } ?? session.currentTask
         case "write":              return target.map { "Writing \($0)" } ?? session.currentTask
         case "read":               return target.map { "Reading \($0)" } ?? session.currentTask
         case "websearch", "webfetch": return "Searching web"
