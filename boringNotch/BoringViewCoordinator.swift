@@ -119,6 +119,7 @@ struct AgentEvent: Codable {
     var title: String
     var message: String
     var host: String?      // "Ghostty", "VS Code", "Terminal", …
+    var hostBundleId: String?
     var project: String?   // basename(cwd)
     var cwd: String?
     var ts: Double?
@@ -140,6 +141,7 @@ struct AgentEvent: Codable {
         case title
         case message
         case host
+        case hostBundleId
         case project
         case cwd
         case ts
@@ -161,6 +163,7 @@ struct AgentEvent: Codable {
         title: String,
         message: String,
         host: String? = nil,
+        hostBundleId: String? = nil,
         project: String? = nil,
         cwd: String? = nil,
         ts: Double? = nil,
@@ -180,6 +183,7 @@ struct AgentEvent: Codable {
         self.title = title
         self.message = message
         self.host = host
+        self.hostBundleId = hostBundleId
         self.project = project
         self.cwd = cwd
         self.ts = ts
@@ -203,6 +207,7 @@ struct AgentEvent: Codable {
         title = (try? container.decode(String.self, forKey: .title)) ?? provider.defaultTitle
         message = (try? container.decode(String.self, forKey: .message)) ?? kind.defaultMessage
         host = try? container.decode(String.self, forKey: .host)
+        hostBundleId = try? container.decode(String.self, forKey: .hostBundleId)
         project = try? container.decode(String.self, forKey: .project)
         cwd = try? container.decode(String.self, forKey: .cwd)
         ts = try? container.decode(Double.self, forKey: .ts)
@@ -243,6 +248,99 @@ extension AgentEvent {
             return nil
         }
     }
+}
+
+enum AgentHostAppResolver {
+    static func image(host: String?, bundleIdentifier: String?) -> NSImage? {
+        guard let appURL = applicationURL(host: host, bundleIdentifier: bundleIdentifier) else {
+            return nil
+        }
+        return NSWorkspace.shared.icon(forFile: appURL.path)
+    }
+
+    static func applicationURL(host: String?, bundleIdentifier: String?) -> URL? {
+        if let bundleIdentifier = nonEmpty(bundleIdentifier),
+           let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier) {
+            return appURL
+        }
+
+        if let aliasBundleIdentifier = aliasBundleIdentifier(for: host),
+           let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: aliasBundleIdentifier) {
+            return appURL
+        }
+
+        return runningApplication(for: host)?.bundleURL
+    }
+
+    private static func aliasBundleIdentifier(for host: String?) -> String? {
+        guard let normalizedHost = normalized(host), !placeholderHosts.contains(normalizedHost) else {
+            return nil
+        }
+
+        return aliases[normalizedHost]
+    }
+
+    private static func runningApplication(for host: String?) -> NSRunningApplication? {
+        guard let normalizedHost = normalized(host), !placeholderHosts.contains(normalizedHost) else {
+            return nil
+        }
+
+        let apps = NSWorkspace.shared.runningApplications.filter { $0.bundleURL != nil }
+        if let exactMatch = apps.first(where: { app in
+            normalized(app.localizedName) == normalizedHost
+                || normalized(app.bundleIdentifier) == normalizedHost
+                || normalized(app.executableURL?.lastPathComponent) == normalizedHost
+        }) {
+            return exactMatch
+        }
+
+        return apps.first { app in
+            [app.localizedName, app.bundleIdentifier, app.executableURL?.lastPathComponent]
+                .compactMap(normalized)
+                .contains { token in
+                    guard token.count >= 3, normalizedHost.count >= 3 else { return false }
+                    return token.contains(normalizedHost) || normalizedHost.contains(token)
+                }
+        }
+    }
+
+    private static func nonEmpty(_ value: String?) -> String? {
+        guard let value = value?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !value.isEmpty else {
+            return nil
+        }
+        return value
+    }
+
+    private static func normalized(_ value: String?) -> String? {
+        guard let value = nonEmpty(value) else { return nil }
+        return value
+            .lowercased()
+            .replacingOccurrences(of: "_", with: "")
+            .replacingOccurrences(of: " ", with: "")
+            .replacingOccurrences(of: ".", with: "")
+            .replacingOccurrences(of: "-", with: "")
+    }
+
+    private static let placeholderHosts: Set<String> = ["unknown", "tmux", "screen"]
+
+    private static let aliases: [String: String] = [
+        "ghostty": "com.mitchellh.ghostty",
+        "vscode": "com.microsoft.VSCode",
+        "visualstudiocode": "com.microsoft.VSCode",
+        "terminal": "com.apple.Terminal",
+        "appleterminal": "com.apple.Terminal",
+        "iterm": "com.googlecode.iterm2",
+        "itermapp": "com.googlecode.iterm2",
+        "iterm2": "com.googlecode.iterm2",
+        "wezterm": "com.github.wez.wezterm",
+        "cursor": "com.todesktop.230313mzl4w4u92",
+        "windsurf": "com.codeium.windsurf",
+        "warp": "dev.warp.Warp-Stable",
+        "zed": "dev.zed.Zed",
+        "kitty": "net.kovidgoyal.kitty",
+        "alacritty": "org.alacritty"
+    ]
 }
 
 private extension String {

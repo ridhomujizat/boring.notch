@@ -257,7 +257,7 @@ private struct SessionRowView: View {
 
     @ViewBuilder
     private var hostIcon: some View {
-        if let host = session.host, let image = hostAppIcon(for: host) {
+        if let image = AgentHostAppResolver.image(host: session.host, bundleIdentifier: session.hostBundleId) {
             Image(nsImage: image)
                 .resizable()
                 .scaledToFit()
@@ -273,58 +273,17 @@ private struct SessionRowView: View {
     // MARK: - Actions
 
     private func openSession() {
-        // Try to activate the host app first
-        if let host = session.host, let bundleId = bundleIdentifier(for: host) {
-            if let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId) {
-                let config = NSWorkspace.OpenConfiguration()
-                config.activates = true
-                NSWorkspace.shared.openApplication(at: appURL, configuration: config) { _, _ in }
-                return
-            }
+        if let appURL = AgentHostAppResolver.applicationURL(host: session.host, bundleIdentifier: session.hostBundleId) {
+            let config = NSWorkspace.OpenConfiguration()
+            config.activates = true
+            NSWorkspace.shared.openApplication(at: appURL, configuration: config) { _, _ in }
+            return
         }
 
         // Fallback: open cwd in Terminal
         if let cwd = session.cwd {
             let url = URL(fileURLWithPath: cwd)
             NSWorkspace.shared.open(url)
-        }
-    }
-
-    // MARK: - Host App Resolution
-
-    private func hostAppIcon(for host: String) -> NSImage? {
-        guard let bundleId = bundleIdentifier(for: host),
-              let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleId)
-        else {
-            return nil
-        }
-        return NSWorkspace.shared.icon(forFile: appURL.path)
-    }
-
-    private func bundleIdentifier(for host: String) -> String? {
-        let normalized = host
-            .lowercased()
-            .replacingOccurrences(of: " ", with: "")
-            .replacingOccurrences(of: ".", with: "")
-            .replacingOccurrences(of: "-", with: "")
-
-        switch normalized {
-        case "ghostty":
-            return "com.mitchellh.ghostty"
-        case "vscode", "visualstudiocode":
-            return "com.microsoft.VSCode"
-        case "terminal", "appleterminal":
-            return "com.apple.Terminal"
-        case "iterm", "itermapp", "iterm2":
-            return "com.googlecode.iterm2"
-        case "wezterm":
-            return "com.github.wez.wezterm"
-        case "cursor":
-            return "com.todesktop.230313mzl4w4u92"
-        case "windsurf":
-            return "com.codeium.windsurf"
-        default:
-            return nil
         }
     }
 }

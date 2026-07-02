@@ -11,21 +11,11 @@ mkdir -p "$(dirname "$OUT")"
 
 INPUT="$(cat)"
 
-# Which terminal/editor is this session running in?
-case "${TERM_PROGRAM:-}" in
-  ghostty)        HOST=Ghostty ;;
-  vscode)         HOST="VS Code" ;;
-  iTerm.app)      HOST=iTerm ;;
-  Apple_Terminal) HOST=Terminal ;;
-  WezTerm)        HOST=WezTerm ;;
-  tmux|"")        case "${__CFBundleIdentifier:-}" in
-                    com.mitchellh.ghostty) HOST=Ghostty ;;
-                    com.microsoft.VSCode)  HOST="VS Code" ;;
-                    com.apple.Terminal)    HOST=Terminal ;;
-                    *) HOST="${TERM_PROGRAM:-unknown}" ;;
-                  esac ;;
-  *)              HOST="${TERM_PROGRAM}" ;;
-esac
+# Which terminal/editor is this session running in? __CFBundleIdentifier is
+# set by macOS for any GUI-launched app, so this resolves dynamically to
+# whatever app is actually running — no per-terminal list to maintain.
+HOST_BUNDLE_ID="${__CFBundleIdentifier:-}"
+HOST="${TERM_PROGRAM:-unknown}"
 
 EVENT="$(printf '%s' "$INPUT" | jq -r '.hook_event_name // ""')"
 CWD="$(printf '%s' "$INPUT" | jq -r '.cwd // ""')"
@@ -59,7 +49,7 @@ if [[ "$EVENT" == "Stop" || "$EVENT" == "Notification" ]]; then
 fi
 
 printf '%s' "$INPUT" | jq -c \
-  --arg host "$HOST" --arg tool "$TOOL" --argjson stats "$STATS" '
+  --arg host "$HOST" --arg hostBundleId "$HOST_BUNDLE_ID" --arg tool "$TOOL" --argjson stats "$STATS" '
   (.hook_event_name) as $e |
   (.cwd // null) as $cwd |
   (.tool_input.file_path // .tool_input.path // "") as $fp |
@@ -68,6 +58,7 @@ printf '%s' "$INPUT" | jq -c \
     provider: "claudeCode",
     title: "Claude Code",
     host: $host,
+    hostBundleId: (if $hostBundleId == "" then null else $hostBundleId end),
     project: (if $cwd then ($cwd | split("/") | last) else null end),
     cwd: $cwd,
     ts: (now | floor),

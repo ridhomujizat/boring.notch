@@ -18,6 +18,7 @@ final class AgentSession: ObservableObject, Identifiable {
     @Published var currentTask: String
     @Published var status: AgentEventKind
     var host: String?
+    var hostBundleId: String?
     var cwd: String?
     @Published var lastActivityTime: Date
     /// Set once we've reminded the user this finished session is idle-waiting.
@@ -42,6 +43,7 @@ final class AgentSession: ObservableObject, Identifiable {
         self.currentTask = event.message
         self.status = event.kind
         self.host = event.host
+        self.hostBundleId = event.hostBundleId
         self.cwd = event.cwd
         self.lastActivityTime = event.ts.map { Date(timeIntervalSince1970: $0) } ?? Date()
         self.tool = event.tool
@@ -58,6 +60,7 @@ final class AgentSession: ObservableObject, Identifiable {
         currentTask = event.message
         status = event.kind
         if let h = event.host { host = h }
+        if let bundleId = event.hostBundleId { hostBundleId = bundleId }
         if let c = event.cwd { cwd = c }
         lastActivityTime = event.ts.map { Date(timeIntervalSince1970: $0) } ?? Date()
         idleReminderSent = false
@@ -171,6 +174,7 @@ final class AgentSessionManager: ObservableObject {
                 title: session.projectName,
                 message: "finished — waiting for you",
                 host: session.host,
+                hostBundleId: session.hostBundleId,
                 project: session.projectName,
                 cwd: session.cwd
             )

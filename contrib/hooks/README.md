@@ -8,10 +8,12 @@ It works by watching `~/.config/boring-notch/events.jsonl`. Each line is a
 normalized `AgentEvent`:
 
 ```json
-{"provider":"claudeCode","kind":"needsInput","title":"Claude Code","message":"needs your approval: Bash","host":"Ghostty","project":"boring.notch","cwd":"/path","ts":1730000000}
+{"provider":"claudeCode","kind":"needsInput","title":"Claude Code","message":"needs your approval: Bash","host":"Ghostty","hostBundleId":"com.mitchellh.ghostty","project":"boring.notch","cwd":"/path","ts":1730000000}
 ```
 
 - `kind`: `working` | `needsInput` | `done` | `error`
+- `hostBundleId` is optional, but lets boring.notch show the exact host app icon
+  without relying on a built-in name mapping.
 
 The app is provider-agnostic — any tool that appends this line format shows up.
 Provider-specific mapping lives in these small scripts.

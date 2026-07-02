@@ -115,7 +115,7 @@ struct AgentSneakPeekView: View {
 
     @ViewBuilder
     private var sessionIcon: some View {
-        if let host = event?.host, let image = AgentHostIcon.image(for: host) {
+        if let image = AgentHostAppResolver.image(host: event?.host, bundleIdentifier: event?.hostBundleId) {
             Image(nsImage: image)
                 .resizable()
                 .scaledToFit()
@@ -125,41 +125,6 @@ struct AgentSneakPeekView: View {
                 .resizable()
                 .scaledToFit()
                 .foregroundStyle(.gray)
-        }
-    }
-}
-
-private enum AgentHostIcon {
-    static func image(for host: String) -> NSImage? {
-        guard let bundleIdentifier = bundleIdentifier(for: host),
-              let appURL = NSWorkspace.shared.urlForApplication(withBundleIdentifier: bundleIdentifier)
-        else {
-            return nil
-        }
-
-        return NSWorkspace.shared.icon(forFile: appURL.path)
-    }
-
-    private static func bundleIdentifier(for host: String) -> String? {
-        let normalizedHost = host
-            .lowercased()
-            .replacingOccurrences(of: " ", with: "")
-            .replacingOccurrences(of: ".", with: "")
-            .replacingOccurrences(of: "-", with: "")
-
-        switch normalizedHost {
-        case "ghostty":
-            return "com.mitchellh.ghostty"
-        case "vscode", "visualstudiocode":
-            return "com.microsoft.VSCode"
-        case "terminal", "appleterminal":
-            return "com.apple.Terminal"
-        case "iterm", "itermapp", "iterm2":
-            return "com.googlecode.iterm2"
-        case "wezterm":
-            return "com.github.wez.wezterm"
-        default:
-            return nil
         }
     }
 }

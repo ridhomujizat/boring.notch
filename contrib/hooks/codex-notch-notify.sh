@@ -23,20 +23,11 @@ if ! printf '%s' "$payload" | jq -e . >/dev/null 2>&1; then
   payload="$(jq -c -n --arg message "$payload" '{type:"notification", message:$message}')"
 fi
 
-case "${TERM_PROGRAM:-}" in
-  ghostty)        HOST=Ghostty ;;
-  vscode)         HOST="VS Code" ;;
-  iTerm.app)      HOST=iTerm ;;
-  Apple_Terminal) HOST=Terminal ;;
-  WezTerm)        HOST=WezTerm ;;
-  tmux|"")        case "${__CFBundleIdentifier:-}" in
-                    com.mitchellh.ghostty) HOST=Ghostty ;;
-                    com.microsoft.VSCode)  HOST="VS Code" ;;
-                    com.apple.Terminal)    HOST=Terminal ;;
-                    *) HOST="${TERM_PROGRAM:-unknown}" ;;
-                  esac ;;
-  *)              HOST="${TERM_PROGRAM}" ;;
-esac
+# Which terminal/editor is this session running in? __CFBundleIdentifier is
+# set by macOS for any GUI-launched app, so this resolves dynamically to
+# whatever app is actually running — no per-terminal list to maintain.
+HOST_BUNDLE_ID="${__CFBundleIdentifier:-}"
+HOST="${TERM_PROGRAM:-unknown}"
 
 CWD="$(printf '%s' "$payload" | jq -r '.cwd // .working_directory // .workingDirectory // ""')"
 [[ -z "$CWD" ]] && CWD="${PWD:-}"
@@ -81,7 +72,7 @@ if [[ "$event_key" =~ stop|done|complete|finish|permission|approval|input|notify
   STATS="$(jq -c -n --argjson t "$TOK" --argjson d "$DIFF" '$t + $d')"
 fi
 
-printf '%s\n' "$payload" | jq -c --arg host "$HOST" --argjson stats "$STATS" '
+printf '%s\n' "$payload" | jq -c --arg host "$HOST" --arg hostBundleId "$HOST_BUNDLE_ID" --argjson stats "$STATS" '
   . as $payload |
   ($payload.hook_event_name // $payload.type // $payload.event // $payload.kind // "") as $eventRaw |
   ($eventRaw | tostring | ascii_downcase) as $event |
@@ -108,6 +99,7 @@ printf '%s\n' "$payload" | jq -c --arg host "$HOST" --argjson stats "$STATS" '
     provider: "codex",
     title: "Codex",
     host: $host,
+    hostBundleId: (if $hostBundleId == "" then null else $hostBundleId end),
     project: (if $cwd then ($cwd | split("/") | last) else null end),
     cwd: $cwd,
     ts: (now | floor),
