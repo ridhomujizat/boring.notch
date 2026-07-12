@@ -555,6 +555,8 @@ printf '%s\n' "$payload" | jq -c --arg host "$HOST" --arg hostBundleId "$HOST_BU
 case "$EVENT" in
   Stop|SubagentStop) printf '{}\n' ;;
 esac
+
+[[ "$EVENT" == "Stop" ]] && rm -f "$COUNTER_DIR/$SESSION_ID" 2>/dev/null || true
 """
 }
 

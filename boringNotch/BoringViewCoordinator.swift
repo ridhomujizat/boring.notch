@@ -596,6 +596,7 @@ class BoringViewCoordinator: ObservableObject {
     // MARK: - Agent peek (same auto-hide pattern as sneakPeek, longer to read text)
 
     private var agentPeekTask: Task<Void, Never>?
+    private var agentNotificationSound: NSSound?
 
     @Published var agentPeek: AgentPeek = .init() {
         didSet {
@@ -614,8 +615,31 @@ class BoringViewCoordinator: ObservableObject {
     }
 
     func showAgentPeek(_ event: AgentEvent) {
+        if event.kind == .done || event.kind == .needsInput {
+            switch event.provider {
+            case .claudeCode, .codex:
+                playAgentNotificationSound(Defaults[.agentNotificationSound])
+            case .other:
+                break
+            }
+        }
+
         withAnimation(.smooth) {
             agentPeek = AgentPeek(show: true, event: event)
+        }
+    }
+
+    func playAgentNotificationSound(_ sound: AgentNotificationSound) {
+        agentNotificationSound?.stop()
+
+        guard sound != .systemDefault else {
+            NSSound.beep()
+            return
+        }
+
+        agentNotificationSound = NSSound(named: NSSound.Name(sound.rawValue))
+        if agentNotificationSound?.play() != true {
+            NSSound.beep()
         }
     }
 

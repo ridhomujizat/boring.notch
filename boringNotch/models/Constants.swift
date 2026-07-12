@@ -68,6 +68,26 @@ enum OptionKeyAction: String, CaseIterable, Identifiable, Defaults.Serializable 
     var id: String { self.rawValue }
 }
 
+enum AgentNotificationSound: String, CaseIterable, Identifiable, Defaults.Serializable {
+    case systemDefault = "System Default"
+    case basso = "Basso"
+    case blow = "Blow"
+    case bottle = "Bottle"
+    case frog = "Frog"
+    case funk = "Funk"
+    case glass = "Glass"
+    case hero = "Hero"
+    case morse = "Morse"
+    case ping = "Ping"
+    case pop = "Pop"
+    case purr = "Purr"
+    case sosumi = "Sosumi"
+    case submarine = "Submarine"
+    case tink = "Tink"
+
+    var id: String { rawValue }
+}
+
 extension Defaults.Keys {
     // MARK: General
     static let menubarIcon = Key<Bool>("menubarIcon", default: true)
@@ -125,6 +145,10 @@ extension Defaults.Keys {
     // MARK: Agent activity (Claude Code / Codex)
     static let enableAgentPeek = Key<Bool>("enableAgentPeek", default: false)
     static let enableAgentLiveActivity = Key<Bool>("enableAgentLiveActivity", default: false)
+    static let agentNotificationSound = Key<AgentNotificationSound>(
+        "agentNotificationSound",
+        default: .systemDefault
+    )
 
     // MARK: Media playback
     static let coloredSpectrogram = Key<Bool>("coloredSpectrogram", default: true)

@@ -150,3 +150,7 @@ printf '%s\n' "$payload" | jq -c --arg host "$HOST" --arg hostBundleId "$HOST_BU
 case "$EVENT" in
   Stop|SubagentStop) printf '{}\n' ;;
 esac
+
+# Codex has no SessionEnd event, so reap the tool counter at turn end instead
+# — otherwise .tool-counters/ accumulates one file per session forever.
+[[ "$EVENT" == "Stop" ]] && rm -f "$COUNTER_DIR/$SESSION_ID" 2>/dev/null || true

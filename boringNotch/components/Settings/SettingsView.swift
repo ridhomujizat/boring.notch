@@ -486,6 +486,7 @@ struct HUD: View {
     @Default(.enableGradient) var enableGradient
     @Default(.optionKeyAction) var optionKeyAction
     @Default(.hudReplacement) var hudReplacement
+    @Default(.agentNotificationSound) private var agentNotificationSound
     @ObservedObject var coordinator = BoringViewCoordinator.shared
     @State private var accessibilityAuthorized = false
     @State private var agentSetupMessage: String?
@@ -615,6 +616,16 @@ struct HUD: View {
                 }
                 .disabled(!Defaults[.enableAgentPeek])
 
+                Picker("Notification sound", selection: $agentNotificationSound) {
+                    ForEach(AgentNotificationSound.allCases) { sound in
+                        Text(sound.rawValue).tag(sound)
+                    }
+                }
+                .disabled(!Defaults[.enableAgentPeek])
+                .onChange(of: agentNotificationSound) { _, newSound in
+                    coordinator.playAgentNotificationSound(newSound)
+                }
+
                 if let agentSetupMessage {
                     Label(
                         agentSetupMessage,
@@ -625,7 +636,7 @@ struct HUD: View {
                     .fixedSize(horizontal: false, vertical: true)
                 }
 
-                Text("Pops a peek when Claude Code / Codex finishes, needs approval, or (optionally) works. Use setup buttons to install the hooks. Requires jq. Codex may ask you to trust hooks with /hooks.")
+                Text("Pops a peek when Claude Code / Codex finishes, needs approval, or (optionally) works. Sounds play only when an agent finishes or needs input. Use setup buttons to install the hooks. Requires jq. Codex may ask you to trust hooks with /hooks.")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .fixedSize(horizontal: false, vertical: true)

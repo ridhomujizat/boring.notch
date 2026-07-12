@@ -109,6 +109,11 @@ final class AgentSessionManager: ObservableObject {
     /// How long finished/errored sessions linger before removal (seconds).
     private let expirationInterval: TimeInterval = 300 // 5 minutes
 
+    /// How long a silent working/needs-input session lingers before we assume
+    /// the agent died without a SessionEnd (killed terminal, crash). A live
+    /// session that fires any event after removal simply reappears.
+    private let staleSessionInterval: TimeInterval = 2 * 60 * 60 // 2 hours
+
     /// How long a finished session sits idle before we remind the user it's
     /// waiting for input. ponytail: fixed threshold, make it a Defaults key if
     /// users want to tune it.
@@ -185,8 +190,15 @@ final class AgentSessionManager: ObservableObject {
     private func removeExpiredSessions() {
         let now = Date()
         sessions.removeAll { session in
-            guard session.status == .done || session.status == .error else { return false }
-            return now.timeIntervalSince(session.lastActivityTime) > expirationInterval
+            let idle = now.timeIntervalSince(session.lastActivityTime)
+            switch session.status {
+            case .done, .error:
+                return idle > expirationInterval
+            case .working, .needsInput:
+                // ponytail: no SessionEnd arrives when the terminal is killed,
+                // so reap silent sessions after 2h instead of keeping them forever.
+                return idle > staleSessionInterval
+            }
         }
     }
 }
